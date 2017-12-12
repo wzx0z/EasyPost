@@ -1,0 +1,43 @@
+{
+	"fvTenant": {
+		"attributes": {
+			"name": "%(Tenant)s"
+		},
+		"children": [{
+			"fvAp": {
+				"attributes": {
+					"name": "%(ANP)s"
+				},
+				"children": [{
+					"fvAEPg": {
+						"attributes": {
+							"dn": "uni/tn-%(Tenant)s/ap-%(ANP)s/epg-%(EPG)s",
+							"name": "%(EPG)s",
+							"rn": "epg-%(EPG)s",
+							"status": "created"
+						},
+						"children": [{
+							"fvRsDomAtt": {
+								"attributes": {
+									"instrImedcy": "immediate",
+									"tDn": "uni/phys-%(PhyDomain)s",
+									"status": "created"
+								},
+								"children": []
+							}
+						},
+						{
+							"fvRsBd": {
+								"attributes": {
+									"tnFvBDName": "%(BD)s",
+									"status": "created,modified"
+								},
+								"children": []
+							}
+						}]
+					}
+				}]
+			}
+		}]
+	}
+}
