@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
+# Author: wuzhixiang
+# Email: wuzhixiang@eccom.com.cn
+
 from __future__ import print_function
 from credentials import URL, LOGIN, PASSWORD
 import requests
 import urllib3
-import json
-import sys
+import yaml
+import sys, getopt, time
 import xlrd
 
 # 关闭urllib3的警告信息
@@ -21,15 +24,16 @@ def login():
     login_url = URL + '/api/aaaLogin.json'
     payload = '{"aaaUser":{"attributes":{"name":"%s","pwd":"%s"}}}}' % (LOGIN, PASSWORD)
     headers = {"Content-Type": "application/json"}
-    print("POST  ", login_url)
+    print("Login APIC ...")
     result = session.post(url=login_url, data=payload, headers=headers, verify=False)
     try:
         result.raise_for_status()
     except:
-        print("\nLogin failed :")
+        print("\Login failed :")
         for i in range(int(result.json()['totalCount'].encode('utf-8'))):
             print("\t", result.json()['imdata'][i]['error']['attributes']['text'])
         sys.exit()
+    print("Login success! Read playbooks ...")
 
 
 def get_template(file_path):
@@ -43,7 +47,8 @@ def get_template(file_path):
         data = open(file_path).read()
         return data
     except Exception as e:
-        print(u'模板读取失败：%s' % e)
+        print(u'模板读取失败：%s\n' % e)
+        sys.exit(2)
         return None
 
 
@@ -62,18 +67,16 @@ def do_post(data, PAYLOAD_TEMPLATE):
     payload = PAYLOAD_TEMPLATE % data
 
     headers = {"Content-Type": "application/json"}
-    print("\nPOST  ", epg_url)
+    # print("\nPOST  ", epg_url)
     result = session.post(url=epg_url, data=payload, headers=headers, verify=False)
 
     try:
         result.raise_for_status()
     except:
-        print("Operation failed :")
+        print("\nOperation failed :")
         for i in range(int(result.json()['totalCount'].encode('utf-8'))):
             print("\t", result.json()['imdata'][i]['error']['attributes']['text'])
         sys.exit()
-
-    print("result: ", result, '\n')
 
 
 def Excel2List(file_path):
@@ -113,21 +116,77 @@ def get_data(file_path):
         data = xlrd.open_workbook(file_path)
         return data
     except Exception as e:
-        print(u'excel表格读取失败：%s' % e)
+        print(u'excel表格读取失败：%s\n' % e)
+        sys.exit(2)
         return None
 
+def get_playbooks(file_path):
+    """
+    获取编排信息
 
-def main():
+    :param file_path: playbooks.yaml路径
+    :return: 编排信息
+    """
+    try:
+        data = open(file_path).read()
+        playbooks = yaml.load(data)
+        return playbooks
+    except Exception as e:
+        print(u'编排信息读取失败：%s\n' % e)
+        sys.exit(2)
+        return None
+
+def execute(playbooks):
+    """
+    执行编排
+
+    :param playbooks: playbooks
+    """
+    if playbooks is not None:
+        for j in playbooks:
+            job = j['job']
+            tasklist = job['tasklist']
+            print('\nPerforming Job:%s ...'%(job['description']))
+            for t in tasklist:
+                task = t['task']
+                print("Task:", task['description'])
+                # 获取模板
+                baseTemplate = get_template(task['template'])
+                # 获取自定义配置项
+                configList = Excel2List(task['sourcedata'])
+                # 逐条推送
+                index = 1
+                for config in configList:
+                    sys.stdout.write('Processing task %d/%d\r' % (index, len(configList)))
+                    sys.stdout.flush()
+                    do_post(config, baseTemplate)
+                    index = index + 1
+                    time.sleep(0.5)
+                print('\nTasks Done!')
+        print('\nPlayBooks Performed!\n')
+
+
+def main(argv):
+    if len(argv) == 0:
+        print('Usage: Common.py -p <playbooks>')
+        sys.exit(2)
+    try:
+        opts, args = getopt.getopt(argv, "hp:", ["playbooks="])
+    except getopt.GetoptError:
+        print('Usage: Common.py -p <playbooks>')
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print('Usage: Common.py -p <playbooks>')
+            sys.exit()
+        elif opt in ("-p", "--playbooks"):
+            playbooksFile = arg
     # 登陆apic
     login()
-    # 获取模板
-    baseTemplate = get_template('template.json')
-    # 获取自定义配置项
-    configList = Excel2List('data.xlsx')
-    # 逐条推送
-    for config in configList:
-        do_post(config, baseTemplate)
+    # 获取编排信息
+    playBooks = get_playbooks(playbooksFile)
+    execute(playBooks)
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1:])

@@ -1,0 +1,7 @@
+- job:
+    description: create EPG associated with BD、ANP、Domain
+    tasklist:
+        - task:
+            description: some operations
+            template: ./template.json
+            sourcedata: ./data.xlsx
