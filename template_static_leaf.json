@@ -1,0 +1,45 @@
+{
+	"fvTenant": {
+		"attributes": {
+			"name": "%(Tenant)s"
+		},
+		"children": [{
+			"fvAp": {
+				"attributes": {
+					"name": "%(ANP)s"
+				},
+				"children": [{
+					"fvAEPg": {
+						"attributes": {
+							"dn": "uni/tn-%(Tenant)s/ap-%(ANP)s/epg-%(EPG)s",
+							"name": "%(EPG)s",
+							"rn": "epg-%(EPG)s"
+						},
+						"children": [{
+							"fvRsNodeAtt": {
+								"attributes": {
+									"descr": "",
+									"encap": "vlan-%(EncapVlan)s",
+									"instrImedcy": "immediate",
+									"mode": "regular",
+									"tDn": "topology/pod-1/node-%(Switch1)s"
+								}
+							}
+						},
+						{
+							"fvRsNodeAtt": {
+								"attributes": {
+									"descr": "",
+									"encap": "vlan-%(EncapVlan)s",
+									"instrImedcy": "immediate",
+									"mode": "regular",
+									"tDn": "topology/pod-1/node-%(Switch2)s"
+								}
+							}
+						}]
+					}
+				}]
+			}
+		}]
+	}
+}

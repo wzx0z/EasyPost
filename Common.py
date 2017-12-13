@@ -120,6 +120,7 @@ def get_data(file_path):
         sys.exit(2)
         return None
 
+
 def get_playbooks(file_path):
     """
     获取编排信息
@@ -136,6 +137,7 @@ def get_playbooks(file_path):
         sys.exit(2)
         return None
 
+
 def execute(playbooks):
     """
     执行编排
@@ -144,9 +146,13 @@ def execute(playbooks):
     """
     if playbooks is not None:
         for j in playbooks:
+            print('============================================================')
             job = j['job']
             tasklist = job['tasklist']
-            print('\nPerforming Job:%s ...'%(job['description']))
+            # 备份
+            take_snapshot(job['tenant'])
+            print('------------------------------------------------------------')
+            print('Performing Job: %s ...' % (job['description']))
             for t in tasklist:
                 task = t['task']
                 print("Task:", task['description'])
@@ -162,8 +168,73 @@ def execute(playbooks):
                     do_post(config, baseTemplate)
                     index = index + 1
                     time.sleep(0.5)
-                print('\nTasks Done!')
+                print('\nJob Done!')
+        print('============================================================')
         print('\nPlayBooks Performed!\n')
+
+
+def take_snapshot(tenantName):
+    """
+    创建快照以便出错恢复
+
+    :param tenantName: 租户名称
+    """
+    print('Taking snapshot for Tenant:%s' % tenantName)
+    snapshot_count = query_snapshot(tenantName)
+    snapshot_url = URL + '/api/node/mo/uni/fabric/configexp-defaultOneTime.json'
+    payload = '''
+    {
+        "configExportP": {
+            "attributes": {
+                "dn": "uni/fabric/configexp-defaultOneTime",
+                "name": "defaultOneTime",
+                "snapshot": "true",
+                "targetDn": "uni/tn-%s",
+                "adminSt": "triggered",
+                "rn": "configexp-defaultOneTime",
+                "status": "created,modified"
+            },
+            "children": []
+        }
+    }
+    ''' % tenantName
+
+    headers = {"Content-Type": "application/json"}
+    result = session.post(url=snapshot_url, data=payload, headers=headers, verify=False)
+
+    try:
+        result.raise_for_status()
+    except:
+        print("\nOperation failed :")
+        for i in range(int(result.json()['totalCount'].encode('utf-8'))):
+            print("\t", result.json()['imdata'][i]['error']['attributes']['text'])
+        sys.exit()
+
+    print('Waiting for snapshot taking...')
+    while (snapshot_count == query_snapshot(tenantName)):
+        time.sleep(1)
+    print('New snapshot created!')
+
+
+def query_snapshot(tenantName):
+    """
+    查询快照信息
+
+    :param tenantName: 租户名称
+    :return: 快照数量
+    """
+    snapshot_url = URL + '/api/node/class/configSnapshot.json'
+    payload = {'query-target-filter': 'and(eq(configSnapshot.rootDn,"uni/tn-%s"))' % tenantName}
+    headers = {"Content-Type": "application/json"}
+    result = session.get(url=snapshot_url, params=payload, headers=headers, verify=False)
+    try:
+        result.raise_for_status()
+    except:
+        print("\nOperation failed :")
+        for i in range(int(result.json()['totalCount'].encode('utf-8'))):
+            print("\t", result.json()['imdata'][i]['error']['attributes']['text'])
+        sys.exit()
+    return result.json()['totalCount']
 
 
 def main(argv):
@@ -185,6 +256,7 @@ def main(argv):
     login()
     # 获取编排信息
     playBooks = get_playbooks(playbooksFile)
+    # 执行
     execute(playBooks)
 
 

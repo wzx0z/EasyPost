@@ -13,7 +13,7 @@
 4. 请留意对象的status状态信息，对象状态会导致不同的操作（Created、Modified、Deleted...）
 
 如何编写playbooks：
-1. 每个playbooks可以包含多个job，每个job以‘- job:’开头，属性：description（工作描述）、tasklist（任务列表）
+1. 每个playbooks可以包含多个job，每个job以‘- job:’开头，属性：description（工作描述）、tasklist（任务列表）、tenant(需要备份的租户)
 2. 每个tasklist可以包含多个task，每个以‘- task:’开头，属性：description（任务描述）、template（模板路径）、sourcedata（数据路径）
 
 操作步骤：

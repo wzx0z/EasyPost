@@ -1,7 +1,16 @@
 - job:
-    description: create EPG associated with BD、ANP、Domain
+    tenant: Test_api
+    description: EPG associated with BD、ANP、Domain
     tasklist:
         - task:
-            description: some operations
-            template: ./template.json
+            description: create EPG
+            template: ./template_epg.json
+            sourcedata: ./data.xlsx
+- job:
+    tenant: Test_api
+    description: Static Leafs
+    tasklist:
+        - task:
+            description: binding leafs
+            template: ./template_static_leaf.json
             sourcedata: ./data.xlsx
