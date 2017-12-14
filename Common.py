@@ -155,6 +155,7 @@ def execute(playbooks):
             print('Performing Job: %s ...' % (job['description']))
             for t in tasklist:
                 task = t['task']
+                print('------------------------------------------------------------')
                 print("Task:", task['description'])
                 # 获取模板
                 baseTemplate = get_template(task['template'])
@@ -168,7 +169,7 @@ def execute(playbooks):
                     do_post(config, baseTemplate)
                     index = index + 1
                     time.sleep(0.5)
-                print('\nJob Done!')
+                print('\r')
         print('============================================================')
         print('\nPlayBooks Performed!\n')
 
@@ -179,8 +180,8 @@ def take_snapshot(tenantName):
 
     :param tenantName: 租户名称
     """
-    print('Taking snapshot for Tenant:%s' % tenantName)
-    snapshot_count = query_snapshot(tenantName)
+    print('Taking snapshot for Tenant: %s' % tenantName)
+    snapshot_count = query_snapshot(tenantName)['totalCount']
     snapshot_url = URL + '/api/node/mo/uni/fabric/configexp-defaultOneTime.json'
     payload = '''
     {
@@ -211,9 +212,12 @@ def take_snapshot(tenantName):
         sys.exit()
 
     print('Waiting for snapshot taking...')
-    while (snapshot_count == query_snapshot(tenantName)):
+    snapshot = query_snapshot(tenantName)
+    while (snapshot_count == snapshot['totalCount']):
         time.sleep(1)
-    print('New snapshot created!')
+        snapshot = query_snapshot(tenantName)
+    print('New snapshot:', snapshot['imdata'][int(snapshot['totalCount']) - 1]['configSnapshot']['attributes']['name'],
+          ' created!')
 
 
 def query_snapshot(tenantName):
@@ -221,7 +225,7 @@ def query_snapshot(tenantName):
     查询快照信息
 
     :param tenantName: 租户名称
-    :return: 快照数量
+    :return: 租户下的所有快照
     """
     snapshot_url = URL + '/api/node/class/configSnapshot.json'
     payload = {'query-target-filter': 'and(eq(configSnapshot.rootDn,"uni/tn-%s"))' % tenantName}
@@ -234,7 +238,7 @@ def query_snapshot(tenantName):
         for i in range(int(result.json()['totalCount'].encode('utf-8'))):
             print("\t", result.json()['imdata'][i]['error']['attributes']['text'])
         sys.exit()
-    return result.json()['totalCount']
+    return result.json()
 
 
 def main(argv):
