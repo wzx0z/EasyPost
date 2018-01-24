@@ -154,7 +154,8 @@ def execute(playbooks):
             job = j['job']
             tasklist = job['tasklist']
             # 备份
-            take_snapshot(job['tenant'])
+            if('tenant' in job):
+                take_snapshot(job['tenant'])
             print('------------------------------------------------------------')
             print('Performing Job: %s ...' % (job['description']))
             for t in tasklist:
