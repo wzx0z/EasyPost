@@ -8,7 +8,7 @@ from credentials import URL, LOGIN, PASSWORD
 import requests
 import urllib3
 import yaml
-import sys, getopt, time
+import sys, getopt, time, threading
 import xlrd
 
 # 关闭urllib3的警告信息
@@ -28,10 +28,13 @@ def login():
     result = session.post(url=login_url, data=payload, headers=headers, verify=False)
     try:
         result.raise_for_status()
-    except:
-        print("\Login failed :")
-        for i in range(int(result.json()['totalCount'].encode('utf-8'))):
-            print("\t", result.json()['imdata'][i]['error']['attributes']['text'])
+    except Exception, e:
+        print("\nLogin failed :")
+        if ('imdata' in result.json()):
+            for i in range(int(result.json()['totalCount'].encode('utf-8'))):
+                print("\t", result.json()['imdata'][i]['error']['attributes']['text'])
+        else:
+            print(e.message)
         sys.exit()
     print("Login success! Read playbooks ...")
 
@@ -65,17 +68,18 @@ def do_post(data, PAYLOAD_TEMPLATE):
         epg_url = URL + '/api/mo/uni.json'
 
     payload = PAYLOAD_TEMPLATE % data
-
     headers = {"Content-Type": "application/json"}
     # print("\nPOST  ", epg_url)
     result = session.post(url=epg_url, data=payload, headers=headers, verify=False)
-
     try:
         result.raise_for_status()
-    except:
+    except Exception, e:
         print("\nOperation failed :")
-        for i in range(int(result.json()['totalCount'].encode('utf-8'))):
-            print("\t", result.json()['imdata'][i]['error']['attributes']['text'])
+        if ('imdata' in result.json()):
+            for i in range(int(result.json()['totalCount'].encode('utf-8'))):
+                print("\t", result.json()['imdata'][i]['error']['attributes']['text'])
+        else:
+            print(e.message)
         sys.exit()
 
 
@@ -181,43 +185,51 @@ def take_snapshot(tenantName):
     :param tenantName: 租户名称
     """
     print('Taking snapshot for Tenant: %s' % tenantName)
-    snapshot_count = query_snapshot(tenantName)['totalCount']
-    snapshot_url = URL + '/api/node/mo/uni/fabric/configexp-defaultOneTime.json'
-    payload = '''
-    {
-        "configExportP": {
-            "attributes": {
-                "dn": "uni/fabric/configexp-defaultOneTime",
-                "name": "defaultOneTime",
-                "snapshot": "true",
-                "targetDn": "uni/tn-%s",
-                "adminSt": "triggered",
-                "rn": "configexp-defaultOneTime",
-                "status": "created,modified"
-            },
-            "children": []
+    if(tenantExist(tenantName)):
+        snapshot_count = query_snapshot(tenantName)['totalCount']
+        snapshot_url = URL + '/api/node/mo/uni/fabric/configexp-defaultOneTime.json'
+        payload = '''
+        {
+            "configExportP": {
+                "attributes": {
+                    "dn": "uni/fabric/configexp-defaultOneTime",
+                    "name": "defaultOneTime",
+                    "snapshot": "true",
+                    "targetDn": "uni/tn-%s",
+                    "adminSt": "triggered",
+                    "rn": "configexp-defaultOneTime",
+                    "status": "created,modified"
+                },
+                "children": []
+            }
         }
-    }
-    ''' % tenantName
+        ''' % tenantName
 
-    headers = {"Content-Type": "application/json"}
-    result = session.post(url=snapshot_url, data=payload, headers=headers, verify=False)
+        headers = {"Content-Type": "application/json"}
+        result = session.post(url=snapshot_url, data=payload, headers=headers, verify=False)
 
-    try:
-        result.raise_for_status()
-    except:
-        print("\nOperation failed :")
-        for i in range(int(result.json()['totalCount'].encode('utf-8'))):
-            print("\t", result.json()['imdata'][i]['error']['attributes']['text'])
-        sys.exit()
+        try:
+            result.raise_for_status()
+        except Exception, e:
+            print("\nOperation failed :")
+            if ('imdata' in result.json()):
+                for i in range(int(result.json()['totalCount'].encode('utf-8'))):
+                    print("\t", result.json()['imdata'][i]['error']['attributes']['text'])
+            else:
+                print(e.message)
+            sys.exit()
 
-    print('Waiting for snapshot taking...')
-    snapshot = query_snapshot(tenantName)
-    while (snapshot_count == snapshot['totalCount']):
-        time.sleep(1)
+        print('Waiting for snapshot taking...')
         snapshot = query_snapshot(tenantName)
-    print('New snapshot:', snapshot['imdata'][int(snapshot['totalCount']) - 1]['configSnapshot']['attributes']['name'],
-          ' created!')
+        while (snapshot_count == snapshot['totalCount']):
+            time.sleep(1)
+            snapshot = query_snapshot(tenantName)
+        print('New snapshot:', snapshot['imdata'][int(snapshot['totalCount']) - 1]['configSnapshot']['attributes']['name'],
+              ' created!')
+    else:
+        choice = raw_input('No tenant named %s . Do you want to continue?(y/n)\t' % tenantName)
+        if(choice.lower() !=  'y'):
+            exit(0)
 
 
 def query_snapshot(tenantName):
@@ -228,17 +240,52 @@ def query_snapshot(tenantName):
     :return: 租户下的所有快照
     """
     snapshot_url = URL + '/api/node/class/configSnapshot.json'
-    payload = {'query-target-filter': 'and(eq(configSnapshot.rootDn,"uni/tn-%s"))' % tenantName}
+    params = {'query-target-filter': 'and(eq(configSnapshot.rootDn,"uni/tn-%s"))' % tenantName}
     headers = {"Content-Type": "application/json"}
-    result = session.get(url=snapshot_url, params=payload, headers=headers, verify=False)
+    result = session.get(url=snapshot_url, params=params, headers=headers, verify=False)
     try:
         result.raise_for_status()
-    except:
+    except Exception, e:
         print("\nOperation failed :")
-        for i in range(int(result.json()['totalCount'].encode('utf-8'))):
-            print("\t", result.json()['imdata'][i]['error']['attributes']['text'])
+        if ('imdata' in result.json()):
+            for i in range(int(result.json()['totalCount'].encode('utf-8'))):
+                print("\t", result.json()['imdata'][i]['error']['attributes']['text'])
+        else:
+            print(e.message)
         sys.exit()
     return result.json()
+
+
+def tenantExist(tenantName):
+    """
+    查询租户是否存在
+    """
+    tenant_url = URL + '/api/mo/uni/tn-%s.json' % tenantName
+    params = {}
+    headers = {"Content-Type": "application/json"}
+    result = session.get(url=tenant_url, params=params, headers=headers, verify=False)
+    try:
+        result.raise_for_status()
+    except Exception, e:
+        print("\nOperation failed :")
+        if ('imdata' in result.json()):
+            for i in range(int(result.json()['totalCount'].encode('utf-8'))):
+                print("\t", result.json()['imdata'][i]['error']['attributes']['text'])
+        else:
+            print(e.message)
+        sys.exit()
+    return True if eval(result.json()['totalCount']) else False
+
+
+def refresh():
+    """
+    刷新Token
+    """
+    refresh_url = URL + '/api/aaaRefresh.json'
+    headers = {"Content-Type": "application/json"}
+    while (True):
+        time.sleep(200)
+        session.get(url=refresh_url, headers=headers, verify=False)
 
 
 def main(argv):
@@ -258,6 +305,10 @@ def main(argv):
             playbooksFile = arg
     # 登陆apic
     login()
+    # 刷新线程
+    t = threading.Thread(target=refresh)
+    t.setDaemon(True)
+    t.start()
     # 获取编排信息
     playBooks = get_playbooks(playbooksFile)
     # 执行

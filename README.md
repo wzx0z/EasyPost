@@ -25,6 +25,6 @@
 
 注意：
 1. 脚本默认忽略https不安全的警告，若需要提示或使用认证，请修改脚本。详情见requests库的guide。
-2. api默认为/api/mo/uni.json，使用其他api请在data.xlsx中添加一列表头为api_url的数据列（url不用包含apic地址，使用默认api则可以不填）。
+2. api默认为/api/mo/uni.json，使用其他api请在data.xlsx中添加一列表头为api_url的数据列（uri不用包含apic地址，使用默认api则可以不填）。
 3. 脚本的执行过程遇到错误就会停止运行，apic会提示可能的出错信息，请注意输出的错误信息。返回response 200即为post成功。
 4. 建议先使用脚本post一条配置，确保配置推送正确后再批量。
